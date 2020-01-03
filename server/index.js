@@ -1,44 +1,62 @@
 const express = require('express');
+const mongoose = require("mongoose");
 const socketio = require('socket.io');
 const http = require('http');
 const cors = require('cors');
-
-const PORT = process.env.PORT || 5000;
-
 const router = require('./router');
+const messagesModel = require('./messages_model');
+
 const { addUser, removeUser, getUser, getUsersInRoom } = require('./users');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketio(server);
 
+const PORT = process.env.PORT || 5000;
+
+const  url  =  "mongodb://localhost:27017/chat";
+const  connect  =  mongoose.connect(url, { useNewUrlParser: true  }).then(res => console.log("Database connected ... "))
+.catch(function (error) {
+  console.error(error);
+  return process.exit();
+});
+
 app.use(cors());
 app.use(router);
 
+
+//let clients = 0
 io.on('connection', function (socket) {
   //io.emit('this', { will: 'be received by everyone'});
   console.log('new User conncted');
+  
+  //clients++
+  //socket.emit("sendMessage",{ description: clients + ' clients connected!'})
 
-  socket.on('join', function ({ name, room }, callback) {
+  socket.on('join', async function ({ name, room }, callback) {
     console.log(`name : ${name} , room : ${room}`);
 
-    const { error, user } = addUser({ id: socket.id, name, room });
+    const { error, user } = await addUser({ id: socket.id, name, room });
 
     if (error) return callback(error);
 
     socket.join(user.room);
 
+    await messagesModel.create({user:user.name,text:`${user.name} has joined`});
+
     socket.emit('message', { user: 'admin', text: `${user.name}, welcome to room ${user.room}.` });
     socket.broadcast.to(user.room).emit('message', { user: 'admin', text: `${user.name} has joined!` });
 
-    io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room) });
+    io.to(user.room).emit('roomData', { room: user.room, users: await getUsersInRoom(user.room) });
 
     callback();
   });
 
-  socket.on('sendMessage', (message, callback) => {
-    const user = getUser(socket.id);
+  socket.on('sendMessage', async(message, callback) => {
+    const user =await getUser(socket.id);
 
+    await messagesModel.create({text:message,user:user.name});
+    
     io.to(user.room).emit('message', { user: user.name, text: message });
     io.to(user.room).emit('roomData', { room: user.room, text: message });
 
@@ -46,8 +64,8 @@ io.on('connection', function (socket) {
   });
 
 
-  socket.on('disconnect', function () {
-    const user = removeUser(socket.id);
+  socket.on('disconnect', async function () {
+    const user = await removeUser(socket.id);
     if (user) {
       io.to(user.room).emit('message', { user: 'Admin', text: `${user.name} has left.` });
       io.to(user.room).emit('roomData', { room: user.room, users: getUsersInRoom(user.room) });

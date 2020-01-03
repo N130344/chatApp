@@ -17,7 +17,7 @@ const Chat = ({ location }) => {
   const [users, setUsers] = useState('');
   const [message, setMessage] = useState('');
   const [messages, setMessages] = useState([]);
-  const ENDPOINT = 'http://localhost:5000';
+  const ENDPOINT = '192.168.1.117:5000';
 
   useEffect(() => {
     const { name, room } = queryString.parse(location.search);
