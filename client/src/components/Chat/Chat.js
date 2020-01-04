@@ -36,9 +36,10 @@ const Chat = ({ location }) => {
 
   useEffect(() => {
     socket.on('message', (message) => {
-      setMessages([...messages, message ]);
+      Array.isArray(message) ? 
+      setMessages([...messages,...message  ]) : setMessages([...messages,message])
     });
-
+   
     socket.on('roomData', ({ users }) => {
       setUsers(users);
     })
@@ -54,7 +55,7 @@ const Chat = ({ location }) => {
     event.preventDefault();
 
     if(message) {
-      socket.emit('sendMessage', message, () => setMessage(''));
+      socket.emit('sendMessage', {message,name,room}, () => setMessage(''));
     }
   }
 
